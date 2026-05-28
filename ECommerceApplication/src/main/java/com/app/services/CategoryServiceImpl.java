@@ -6,9 +6,7 @@ import java.util.stream.Collectors;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import com.app.entites.Category;
@@ -18,6 +16,7 @@ import com.app.exceptions.ResourceNotFoundException;
 import com.app.payloads.CategoryDTO;
 import com.app.payloads.CategoryResponse;
 import com.app.repositories.CategoryRepo;
+import com.app.util.PaginationUtils;
 
 import jakarta.transaction.Transactional;
 
@@ -27,7 +26,7 @@ public class CategoryServiceImpl implements CategoryService {
 
 	@Autowired
 	private CategoryRepo categoryRepo;
-	
+
 	@Autowired
 	private ProductService productService;
 
@@ -49,57 +48,48 @@ public class CategoryServiceImpl implements CategoryService {
 
 	@Override
 	public CategoryResponse getCategories(Integer pageNumber, Integer pageSize, String sortBy, String sortOrder) {
-		Sort sortByAndOrder = sortOrder.equalsIgnoreCase("asc") ? Sort.by(sortBy).ascending()
-				: Sort.by(sortBy).descending();
+		Pageable pageDetails = PaginationUtils.createPageable(pageNumber, pageSize, sortBy, sortOrder);
 
-		Pageable pageDetails = PageRequest.of(pageNumber, pageSize, sortByAndOrder);
-		
 		Page<Category> pageCategories = categoryRepo.findAll(pageDetails);
 
 		List<Category> categories = pageCategories.getContent();
 
-		if (categories.size() == 0) {
+		if (categories.isEmpty()) {
 			throw new APIException("No category is created till now");
 		}
 
 		List<CategoryDTO> categoryDTOs = categories.stream()
-				.map(category -> modelMapper.map(category, CategoryDTO.class)).collect(Collectors.toList());
+				.map(category -> modelMapper.map(category, CategoryDTO.class))
+				.collect(Collectors.toList());
 
 		CategoryResponse categoryResponse = new CategoryResponse();
-		
 		categoryResponse.setContent(categoryDTOs);
-		categoryResponse.setPageNumber(pageCategories.getNumber());
-		categoryResponse.setPageSize(pageCategories.getSize());
-		categoryResponse.setTotalElements(pageCategories.getTotalElements());
-		categoryResponse.setTotalPages(pageCategories.getTotalPages());
-		categoryResponse.setLastPage(pageCategories.isLast());
-		
+		PaginationUtils.populateCategoryResponse(categoryResponse, pageCategories);
+
 		return categoryResponse;
 	}
 
 	@Override
 	public CategoryDTO updateCategory(Category category, Long categoryId) {
-		Category savedCategory = categoryRepo.findById(categoryId)
+		categoryRepo.findById(categoryId)
 				.orElseThrow(() -> new ResourceNotFoundException("Category", "categoryId", categoryId));
 
 		category.setCategoryId(categoryId);
 
-		savedCategory = categoryRepo.save(category);
+		Category updatedCategory = categoryRepo.save(category);
 
-		return modelMapper.map(savedCategory, CategoryDTO.class);
+		return modelMapper.map(updatedCategory, CategoryDTO.class);
 	}
 
 	@Override
 	public String deleteCategory(Long categoryId) {
 		Category category = categoryRepo.findById(categoryId)
 				.orElseThrow(() -> new ResourceNotFoundException("Category", "categoryId", categoryId));
-		
+
 		List<Product> products = category.getProducts();
 
-		products.forEach(product -> {
-			productService.deleteProduct(product.getProductId());
-		});
-		
+		products.forEach(product -> productService.deleteProduct(product.getProductId()));
+
 		categoryRepo.delete(category);
 
 		return "Category with categoryId: " + categoryId + " deleted successfully !!!";

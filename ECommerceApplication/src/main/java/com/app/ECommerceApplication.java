@@ -3,6 +3,8 @@ package com.app;
 import java.util.List;
 
 import org.modelmapper.ModelMapper;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
@@ -20,6 +22,8 @@ import io.swagger.v3.oas.annotations.security.SecurityScheme;
 @SpringBootApplication
 @SecurityScheme(name = "E-Commerce Application", scheme = "bearer", type = SecuritySchemeType.HTTP, in = SecuritySchemeIn.HEADER)
 public class ECommerceApplication implements CommandLineRunner {
+
+	private static final Logger log = LoggerFactory.getLogger(ECommerceApplication.class);
 
 	@Autowired
 	private RoleRepo roleRepo;
@@ -46,12 +50,11 @@ public class ECommerceApplication implements CommandLineRunner {
 
 			List<Role> roles = List.of(adminRole, userRole);
 
-			List<Role> savedRoles = roleRepo.saveAll(roles);
-
-			savedRoles.forEach(System.out::println);
+			roleRepo.saveAll(roles);
+			log.info("Default roles initialized");
 
 		} catch (Exception e) {
-			e.printStackTrace();
+			log.warn("Default roles may already exist");
 		}
 	}
 

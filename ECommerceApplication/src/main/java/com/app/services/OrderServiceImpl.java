@@ -8,9 +8,7 @@ import java.util.stream.Collectors;
 import org.modelmapper.ModelMapper;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.data.domain.Page;
-import org.springframework.data.domain.PageRequest;
 import org.springframework.data.domain.Pageable;
-import org.springframework.data.domain.Sort;
 import org.springframework.stereotype.Service;
 
 import com.app.entites.Cart;
@@ -30,6 +28,7 @@ import com.app.repositories.OrderItemRepo;
 import com.app.repositories.OrderRepo;
 import com.app.repositories.PaymentRepo;
 import com.app.repositories.UserRepo;
+import com.app.util.PaginationUtils;
 
 import jakarta.transaction.Transactional;
 
@@ -93,7 +92,7 @@ public class OrderServiceImpl implements OrderService {
 
 		List<CartItem> cartItems = cart.getCartItems();
 
-		if (cartItems.size() == 0) {
+		if (cartItems.isEmpty()) {
 			throw new APIException("Cart is empty");
 		}
 
@@ -137,8 +136,8 @@ public class OrderServiceImpl implements OrderService {
 		List<OrderDTO> orderDTOs = orders.stream().map(order -> modelMapper.map(order, OrderDTO.class))
 				.collect(Collectors.toList());
 
-		if (orderDTOs.size() == 0) {
-			throw new APIException("No orders placed yet by the user with email: " + emailId);
+		if (orderDTOs.isEmpty()) {
+			throw new APIException("No orders placed yet by the user");
 		}
 
 		return orderDTOs;
@@ -159,10 +158,7 @@ public class OrderServiceImpl implements OrderService {
 	@Override
 	public OrderResponse getAllOrders(Integer pageNumber, Integer pageSize, String sortBy, String sortOrder) {
 
-		Sort sortByAndOrder = sortOrder.equalsIgnoreCase("asc") ? Sort.by(sortBy).ascending()
-				: Sort.by(sortBy).descending();
-
-		Pageable pageDetails = PageRequest.of(pageNumber, pageSize, sortByAndOrder);
+		Pageable pageDetails = PaginationUtils.createPageable(pageNumber, pageSize, sortBy, sortOrder);
 
 		Page<Order> pageOrders = orderRepo.findAll(pageDetails);
 
@@ -171,19 +167,14 @@ public class OrderServiceImpl implements OrderService {
 		List<OrderDTO> orderDTOs = orders.stream().map(order -> modelMapper.map(order, OrderDTO.class))
 				.collect(Collectors.toList());
 		
-		if (orderDTOs.size() == 0) {
+		if (orderDTOs.isEmpty()) {
 			throw new APIException("No orders placed yet by the users");
 		}
 
 		OrderResponse orderResponse = new OrderResponse();
-		
 		orderResponse.setContent(orderDTOs);
-		orderResponse.setPageNumber(pageOrders.getNumber());
-		orderResponse.setPageSize(pageOrders.getSize());
-		orderResponse.setTotalElements(pageOrders.getTotalElements());
-		orderResponse.setTotalPages(pageOrders.getTotalPages());
-		orderResponse.setLastPage(pageOrders.isLast());
-		
+		PaginationUtils.populateOrderResponse(orderResponse, pageOrders);
+
 		return orderResponse;
 	}
 
